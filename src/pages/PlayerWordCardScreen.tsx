@@ -1,39 +1,27 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { doc, getDoc, collection, query, where, getDocs, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { db, auth } from '../firebase/config';
 import bg from '../assets/bg.jpeg';
 import logo from '../assets/logo.png';
-import civilianIcon from '../assets/civilain.png';
-import undercoverIcon from '../assets/undercover.png';
-import mrWhiteIcon from '../assets/mrwhite.png';
 import cardSilhouette from '../assets/cards.png';
 import GameLogo from '../components/GameLogo';
 import RoleList from '../components/RoleList';
+import ROLE_META from "../constants/RoleMeta";
 
-type Roles = {
-  civilian: number;
-  undercover: number;
-  mrWhite: number;
-};
-
-const ROLE_META = {
-  civilian: {
-    label: 'Civilian',
-    color: '#8fa9d9',
-    icon: civilianIcon,
-  },
-  undercover: {
-    label: 'Undercover',
-    color: '#2d2e3e',
-    icon: undercoverIcon,
-  },
-  mrWhite: {
-    label: 'Mr. White',
-    color: '#ffe7a0',
-    icon: mrWhiteIcon,
-  },
-};
+interface GameState {
+  gameId: string;
+  playersCount: number;
+  roles: {
+    civilian: number;
+    undercover: number;
+    mrwhite: number;
+  };
+  difficulty: string;
+  currentPlayer?: number;
+  assignedRoles?: string[];
+  assignedNames?: string[];
+}
 
 export default function PlayerWordCardScreen() {
   const location = useLocation();
@@ -46,77 +34,88 @@ export default function PlayerWordCardScreen() {
     currentPlayer = 1,
     assignedRoles = [],
     assignedNames = [],
-  } = location.state || {};
+  } = location.state as GameState || {};
 
-  // State untuk menyimpan username player yang sedang memilih card
   const [playerName, setPlayerName] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Handler ketika card diklik
   const handleCardClick = async (idx: number) => {
-    // Hanya card giliran player saat ini yang bisa diklik
-    if (idx !== assignedNames.length) return;
+    try {
+      if (idx < assignedNames.length) return;
 
-    // Cek apakah playerName sudah ada di assignedNames
-    if (!playerName) {
-      // Redirect ke login username
-      navigate('/login-username', {
-        state: {
-          gameId,
-          playersCount,
-          roles,
-          difficulty,
-          currentPlayer,
-          assignedRoles,
-          assignedNames,
-        },
-      });
-      return;
-    }
+      if (!playerName) {
+        navigate('/login-username', { state: location.state });
+        return;
+      }
 
-    // Cek di Firestore apakah player sudah ada
-    const playerRef = doc(db, 'games', gameId, 'players', playerName);
-    const playerSnap = await getDoc(playerRef);
-    if (playerSnap.exists()) {
-      // Sudah login, langsung ke PlayerShowWord
-      const data = playerSnap.data();
-      navigate('/playershowword', {
-        state: {
-          gameId,
-          playersCount,
-          roles,
-          difficulty,
-          currentPlayer,
-          assignedRoles,
-          assignedNames,
-          username: playerName,
-          role: data.role,
-          word: data.word,
-        },
-      });
-    } else {
-      // Belum login, redirect ke login username
-      navigate('/login-username', {
-        state: {
-          gameId,
-          playersCount,
-          roles,
-          difficulty,
-          currentPlayer,
-          assignedRoles,
-          assignedNames,
-        },
-      });
+      const playerRef = doc(db, 'games', gameId, 'players', auth.currentUser?.uid || '');
+      const playerSnap = await getDoc(playerRef);
+
+      if (playerSnap.exists()) {
+        const playerData = playerSnap.data();
+        navigate('/playershowword', {
+          state: {
+            ...location.state,
+            username: playerName,
+            role: playerData.role,
+            word: playerData.word,
+          },
+        });
+      } else {
+        navigate('/login-username', { state: location.state });
+      }
+    } catch (err) {
+      setError('Failed to process card selection');
+      console.error(err);
     }
   };
 
-  // Untuk demo, playerName diambil dari assignedNames[currentPlayer-1] jika sudah ada
+  const assignWords = async () => {
+    try {
+      const wordsQuery = query(
+        collection(db, 'words'), 
+        where('difficulty', '==', difficulty)
+      );
+      const wordsSnap = await getDocs(wordsQuery);
+      const words = wordsSnap.docs.map(doc => doc.data().word);
+      
+      if (words.length === 0) {
+        throw new Error('No words found for selected difficulty');
+      }
+
+      const selectedWord = words[Math.floor(Math.random() * words.length)];
+      const similarWord = getSimilarWord(selectedWord); // Implement this function
+
+      const playersSnap = await getDocs(collection(db, 'games', gameId, 'players'));
+      const batch = writeBatch(db);
+
+      playersSnap.forEach(playerDoc => {
+        const player = playerDoc.data();
+        const word = 
+          player.role === 'undercover' ? similarWord :
+          player.role === 'civilian' ? selectedWord :
+          null;
+        
+        batch.update(playerDoc.ref, { word });
+      });
+
+      await batch.commit();
+    } catch (err) {
+      setError('Failed to assign words');
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     if (assignedNames && assignedNames.length >= currentPlayer) {
       setPlayerName(assignedNames[currentPlayer - 1]);
     } else {
       setPlayerName(null);
     }
-  }, [assignedNames, currentPlayer]);
+
+    // Assign words when component mounts
+    assignWords();
+  }, []);
 
   return (
     <div
@@ -129,6 +128,19 @@ export default function PlayerWordCardScreen() {
     >
       {/* Overlay */}
       <div className="absolute inset-0 bg-[#0b1b2a]/70 z-0" />
+
+      {/* Error Message */}
+      {error && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow-lg z-50">
+          {error}
+          <button 
+            onClick={() => setError(null)} 
+            className="ml-2 font-bold"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Logo */}
       <GameLogo src={logo} />
@@ -156,19 +168,15 @@ export default function PlayerWordCardScreen() {
             }}
           >
             {Array.from({ length: playersCount }).map((_, idx) => {
-              // Card sudah dipilih
               const isPicked = idx < assignedNames.length;
-              // Card giliran player saat ini
-              const isCurrent = idx === assignedNames.length;
               return (
                 <div key={idx} className="flex items-center justify-center">
                   <button
                     className={`bg-[#ffe7a0] rounded-xl shadow-lg w-[120px] h-[170px] md:w-[150px] md:h-[210px] flex items-center justify-center border-4 border-[#22364a] transition
-                      ${isPicked ? "opacity-40 cursor-not-allowed" : ""}
-                      ${isCurrent ? "ring-4 ring-blue-400" : ""}
+                      ${isPicked ? "opacity-40 cursor-not-allowed" : "hover:scale-105"}
                     `}
                     onClick={() => handleCardClick(idx)}
-                    disabled={!isCurrent || isPicked}
+                    disabled={isPicked}
                     style={{ outline: 'none' }}
                   >
                     <img src={cardSilhouette} alt="?" className="w-16 h-16 md:w-20 md:h-20 opacity-90" />
@@ -181,4 +189,15 @@ export default function PlayerWordCardScreen() {
       </div>
     </div>
   );
+}
+
+// Helper function - implement according to your word matching logic
+function getSimilarWord(word: string): string {
+  // Example implementation
+  const similarWords: Record<string, string> = {
+    'pizza': 'pasta',
+    'apple': 'orange',
+    'car': 'bus'
+  };
+  return similarWords[word.toLowerCase()] || word;
 }

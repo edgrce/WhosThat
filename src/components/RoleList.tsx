@@ -1,7 +1,7 @@
 type Roles = {
   civilian: number;
   undercover: number;
-  mrWhite: number;
+  mrwhite: number;
 };
 
 type RoleMeta = {

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { doc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, setDoc, collection, query, where, getDocs, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase/config";
 import bg from "../assets/bg.jpeg";
 
@@ -10,18 +10,12 @@ type Roles = {
   mrWhite: number;
 };
 
-
-function getRandomRole(
-  roles: Roles,
-  assignedRoles: string[]
-): keyof Roles {
-  // Buat array role pool sesuai sisa role
+function getRandomRole(roles: Roles, assignedRoles: string[]): keyof Roles {
   let pool: (keyof Roles)[] = [];
   Object.entries(roles).forEach(([role, count]) => {
     const already = assignedRoles.filter((r) => r === role).length;
     for (let i = 0; i < (count as number) - already; i++) pool.push(role as keyof Roles);
   });
-  // Random ambil satu
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -52,29 +46,42 @@ export default function LoginUsername() {
       return;
     }
     try {
-      // Ambil satu data word dari library sesuai difficulty (random)
-      const q = query(
-        collection(db, "words"),
-        where("difficulty", "==", difficulty)
-      );
-      const snap = await getDocs(q);
-      const wordsArr = snap.docs.map(doc => doc.data());
-      if (wordsArr.length === 0) {
-        setError("No word found for this difficulty.");
-        return;
+      const gameDoc = await getDoc(doc(db, "games", gameId));
+      const gameData = gameDoc.data();
+
+      let word1 = gameData?.word1;
+      let word2 = gameData?.word2;
+
+      if (!word1 || !word2) {
+        // Fallback: cari di words collection kalau belum generate
+        const q = query(
+          collection(db, "words"),
+          where("difficulty", "==", difficulty)
+        );
+        const snap = await getDocs(q);
+        const wordsArr = snap.docs.map(doc => doc.data());
+        if (wordsArr.length === 0) {
+          setError("No word found for this difficulty.");
+          return;
+        }
+        const randomWord = wordsArr[Math.floor(Math.random() * wordsArr.length)];
+        word1 = randomWord.word1;
+        word2 = randomWord.word2;
+
+        // Simpan ke games/{gameId} supaya stabil
+        await updateDoc(doc(db, "games", gameId), {
+          word1,
+          word2,
+        });
       }
-      const randomWord = wordsArr[Math.floor(Math.random() * wordsArr.length)];
 
-      // Tentukan role secara random dari sisa role
-      const role = getRandomRole(roles, assignedRoles);
-
-      // Tentukan word yang didapat player
+      // Tentukan role
+      const role = getRandomRole(roles, assignedRoles).toLowerCase();
       let word = "";
-      if (role === "civilian") word = randomWord.word1;
-      else if (role === "undercover") word = randomWord.word2;
-      // mrWhite: word tetap kosong
+      if (role === "civilian") word = word1;
+      else if (role === "undercover") word = word2;
+      else word = ""; // Mr White tidak punya kata
 
-      // Simpan ke Firestore di games/{gameId}/players/{username}
       const playerRef = doc(db, "games", gameId, "players", username);
       await setDoc(playerRef, {
         username,
@@ -84,7 +91,6 @@ export default function LoginUsername() {
         createdAt: new Date(),
       });
 
-      // Redirect ke halaman tampil kata, kirim data via state
       navigate("/playershowword", {
         state: {
           gameId,
@@ -100,8 +106,8 @@ export default function LoginUsername() {
         },
       });
     } catch (err) {
-      setError("Login failed");
       console.error(err);
+      setError("Login failed");
     }
   };
 

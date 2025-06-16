@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { doc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "../firebase/config";
 import bg from "../assets/bg.jpeg";
 import logo from "../assets/logo.png";
+import GameLogo from "../components/GameLogo";
 
 const MIN_PLAYERS = 4;
 const MAX_PLAYERS = 12;
@@ -34,6 +37,48 @@ export default function GameSetup() {
 
   const canStart = Object.values(roles).reduce((a, b) => a + b, 0) === players;
 
+  const handleStart = async () => {
+    try {
+      const gameId = `game_${Date.now()}`;
+
+      // 1️⃣ Ambil satu pasang kata dari collection words sesuai difficulty
+      const q = query(collection(db, "words"), where("difficulty", "==", difficulty));
+      const snap = await getDocs(q);
+      const wordsArr = snap.docs.map(doc => doc.data());
+      if (wordsArr.length === 0) {
+        alert("No word found for this difficulty.");
+        return;
+      }
+      const randomWord = wordsArr[Math.floor(Math.random() * wordsArr.length)];
+
+      // 2️⃣ Simpan ke Firestore: games/{gameId}
+      const gameRef = doc(db, "games", gameId);
+      await setDoc(gameRef, {
+        difficulty,
+        roles,
+        word1: randomWord.word1,
+        word2: randomWord.word2,
+        createdAt: new Date(),
+      });
+
+      // 3️⃣ Lanjut ke player draw, bawa gameId dan info
+      navigate("/playerdraw", {
+        state: {
+          gameId,
+          playersCount: players,
+          roles,
+          difficulty,
+          currentPlayer: 1,
+          assignedRoles: [],
+          assignedNames: [],
+        },
+      });
+    } catch (err) {
+      console.error("Failed to start game:", err);
+      alert("Failed to start game. Please try again.");
+    }
+  };
+
   return (
     <div
       className="relative min-h-screen flex items-center justify-center font-sans"
@@ -47,12 +92,7 @@ export default function GameSetup() {
       <div className="absolute inset-0 bg-[#0b1b2a]/70 z-0" />
 
       {/* Logo */}
-      <img
-        src={logo}
-        alt="Logo"
-        className="absolute top-8 left-10 z-10 w-48"
-        style={{ filter: "drop-shadow(0 2px 8px #000a)" }}
-      />
+      <GameLogo src={logo} />
 
       {/* Main Card */}
       <div className="relative z-10 flex flex-col items-center">
@@ -188,20 +228,7 @@ export default function GameSetup() {
                   : "hover:bg-[#ffe7a0]/90 hover:shadow-xl cursor-pointer"
               }`}
             disabled={!canStart}
-            onClick={() => {
-              const gameId = `game_${Date.now()}`;
-              navigate("/playerdraw", {
-                state: {
-                  gameId,
-                  playersCount: players,
-                  roles,
-                  difficulty,
-                  currentPlayer: 1,
-                  assignedRoles: [],
-                  assignedNames: [],
-                },
-              });
-            }}
+            onClick={handleStart}
           >
             <svg
               className="mr-2"
