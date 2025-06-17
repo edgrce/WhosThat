@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { doc, setDoc, collection, query, where, getDocs, getDoc, updateDoc } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  getDoc,
+  updateDoc,
+} from "firebase/firestore";
 import { db } from "../firebase/config";
 import bg from "../assets/bg.jpeg";
 
@@ -10,12 +19,26 @@ type Roles = {
   mrWhite: number;
 };
 
-function getRandomRole(roles: Roles, assignedRoles: string[]): keyof Roles {
-  let pool: (keyof Roles)[] = [];
+function getRandomRole(
+  roles: Roles,
+  realAssignedRoles: string[]
+): keyof Roles {
+  const pool: (keyof Roles)[] = [];
+
   Object.entries(roles).forEach(([role, count]) => {
-    const already = assignedRoles.filter((r) => r === role).length;
-    for (let i = 0; i < (count as number) - already; i++) pool.push(role as keyof Roles);
+    const used = realAssignedRoles.filter(
+      (r) => r?.toLowerCase() === role.toLowerCase()
+    ).length;
+    const remaining = (count as number) - used;
+    for (let i = 0; i < remaining; i++) {
+      pool.push(role as keyof Roles);
+    }
   });
+
+  if (pool.length === 0) {
+    throw new Error("No available role left to assign!");
+  }
+
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -41,47 +64,59 @@ export default function LoginUsername() {
       setError("Username required");
       return;
     }
-    if (assignedNames.includes(username)) {
-      setError("Username already used in this game.");
-      return;
-    }
-    try {
-      const gameDoc = await getDoc(doc(db, "games", gameId));
-      const gameData = gameDoc.data();
 
-      let word1 = gameData?.word1;
-      let word2 = gameData?.word2;
+    try {
+      // ✅ Ambil semua player yang sudah login
+      const playersSnap = await getDocs(
+        collection(db, "games", gameId, "players")
+      );
+      const realAssignedRoles = playersSnap.docs.map((doc) =>
+        doc.data().role?.toLowerCase()
+      );
+      const realAssignedNames = playersSnap.docs.map((doc) =>
+        doc.data().username
+      );
+
+      // ✅ Cek username unik
+      if (realAssignedNames.includes(username)) {
+        setError("Username already used in this game.");
+        return;
+      }
+
+      // ✅ Ambil kata civilian & undercover
+      const gameDoc = await getDoc(doc(db, "games", gameId));
+      let word1 = gameDoc.data()?.word1;
+      let word2 = gameDoc.data()?.word2;
 
       if (!word1 || !word2) {
-        // Fallback: cari di words collection kalau belum generate
         const q = query(
           collection(db, "words"),
           where("difficulty", "==", difficulty)
         );
         const snap = await getDocs(q);
-        const wordsArr = snap.docs.map(doc => doc.data());
+        const wordsArr = snap.docs.map((doc) => doc.data());
         if (wordsArr.length === 0) {
           setError("No word found for this difficulty.");
           return;
         }
-        const randomWord = wordsArr[Math.floor(Math.random() * wordsArr.length)];
+        const randomWord =
+          wordsArr[Math.floor(Math.random() * wordsArr.length)];
         word1 = randomWord.word1;
         word2 = randomWord.word2;
 
-        // Simpan ke games/{gameId} supaya stabil
-        await updateDoc(doc(db, "games", gameId), {
-          word1,
-          word2,
-        });
+        await updateDoc(doc(db, "games", gameId), { word1, word2 });
       }
 
-      // Tentukan role
-      const role = getRandomRole(roles, assignedRoles).toLowerCase();
+      // ✅ Assign role with real data
+      const role = getRandomRole(roles, realAssignedRoles).toLowerCase();
+
+      // ✅ Assign word based on role
       let word = "";
       if (role === "civilian") word = word1;
       else if (role === "undercover") word = word2;
-      else word = ""; // Mr White tidak punya kata
+      else word = ""; // Mr. White tidak punya kata
 
+      // ✅ Simpan player ke Firestore
       const playerRef = doc(db, "games", gameId, "players", username);
       await setDoc(playerRef, {
         username,
@@ -91,6 +126,7 @@ export default function LoginUsername() {
         createdAt: new Date(),
       });
 
+      // ✅ Lanjut ke show word page
       navigate("/playershowword", {
         state: {
           gameId,
@@ -98,8 +134,8 @@ export default function LoginUsername() {
           roles,
           difficulty,
           currentPlayer,
-          assignedRoles: [...assignedRoles, role],
-          assignedNames: [...assignedNames, username],
+          assignedRoles: [...realAssignedRoles, role],
+          assignedNames: [...realAssignedNames, username],
           username,
           role,
           word,
@@ -134,7 +170,7 @@ export default function LoginUsername() {
           placeholder="Username"
           className="mt-8 mb-8 bg-transparent border-b-2 border-[#22364a] text-center text-[#22364a] text-xl outline-none w-64"
           value={username}
-          onChange={e => setUsername(e.target.value)}
+          onChange={(e) => setUsername(e.target.value)}
         />
         {error && <div className="text-red-600 mb-2">{error}</div>}
         <button

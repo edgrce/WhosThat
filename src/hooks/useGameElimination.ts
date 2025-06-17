@@ -1,11 +1,4 @@
-// ✅ FINAL: useGameElimination.ts
-import {
-  doc,
-  updateDoc,
-  getDoc,
-  getDocs,
-  collection
-} from "firebase/firestore";
+import { doc, updateDoc, getDoc, getDocs, collection } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { calculateScores } from "../utils/scoreUtils";
 
@@ -18,20 +11,10 @@ export interface Player {
   isMrWhiteCorrect?: boolean;
 }
 
-export async function processElimination(
-  gameId: string,
-  playerId: string,
-  player: any,
-  navigate: any
-) {
-  return true;
-}
-
 export async function checkWinnerAndFinishGame(gameId: string): Promise<Winner | undefined> {
   const gameRef = doc(db, "games", gameId);
   const gameDoc = await getDoc(gameRef);
   const gameData = gameDoc.data();
-
   const mrWhiteGuessed = gameData?.mrWhiteGuessed ?? false;
 
   const snap = await getDocs(collection(db, "games", gameId, "players"));
@@ -46,7 +29,9 @@ export async function checkWinnerAndFinishGame(gameId: string): Promise<Winner |
   });
 
   const alive = players.filter((p) => !p.eliminated);
-  const aliveRoles = new Set(alive.map((p) => p.role.toLowerCase()));
+  const aliveRoles = new Set(alive.map((p) => p.role));
+  const aliveCivilian = alive.filter(p => p.role === "civilian").length;
+  const aliveUndercover = alive.filter(p => p.role === "undercover").length;
 
   let winner: Winner | undefined = undefined;
 
@@ -56,15 +41,16 @@ export async function checkWinnerAndFinishGame(gameId: string): Promise<Winner |
     }
   }
 
+  if (aliveUndercover >= aliveCivilian) {
+    winner = "undercover";
+  }
+
   if (!aliveRoles.has("civilian") && aliveRoles.has("undercover")) {
     winner = "undercover";
   }
 
   if (winner) {
-    await updateDoc(gameRef, {
-      status: "finished",
-      winner: winner,
-    });
+    await updateDoc(gameRef, { status: "finished", winner: winner });
     return winner;
   }
 
@@ -79,15 +65,12 @@ export async function finalizeEliminationAndCheckWinner(
   const playerRef = doc(db, "games", gameId, "players", playerId);
   const playerSnap = await getDoc(playerRef);
   const player = playerSnap.data();
-
   const role = player?.role?.toLowerCase();
 
   await updateDoc(playerRef, { eliminated: true });
 
   if (role === "mrwhite") {
-    navigate("/mrwhiteguess", {
-      state: { gameId },
-    });
+    navigate("/mrwhiteguess", { state: { gameId } });
     return;
   }
 
@@ -106,17 +89,10 @@ export async function finalizeEliminationAndCheckWinner(
     });
 
     const scores = calculateScores(players, winner);
+    await Promise.all(Object.entries(scores).map(([id, s]) =>
+      updateDoc(doc(db, "games", gameId, "players", id), { score: s.totalScore })
+    ));
 
-    await Promise.all(
-      Object.entries(scores).map(([id, s]) =>
-        updateDoc(doc(db, "games", gameId, "players", id), {
-          score: s.totalScore,
-        })
-      )
-    );
-
-    navigate("/leaderboard", {
-      state: { gameId, winner },
-    });
+    navigate("/leaderboard", { state: { gameId, winner } });
   }
 }

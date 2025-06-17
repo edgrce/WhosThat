@@ -101,7 +101,6 @@ export default function PlayerWordCardScreen() {
 
       await batch.commit();
     } catch (err) {
-      setError('Failed to assign words');
       console.error(err);
     }
   };
