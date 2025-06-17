@@ -48,7 +48,7 @@ export default function MrWhiteGuess() {
     const normalizedWord = word1.trim().toLowerCase();
 
     if (normalizedGuess === normalizedWord) {
-      // ✅ BENAR → update status & winner
+      // ✅ BENAR: Mr. White menang
       await updateDoc(doc(db, "games", gameId), {
         status: "finished",
         winner: "mrwhite",
@@ -56,13 +56,12 @@ export default function MrWhiteGuess() {
         isMrWhiteCorrect: true,
       });
 
-      // ✅ Hitung score & simpan ke Firestore
       const snap = await getDocs(collection(db, "games", gameId, "players"));
       const players: Player[] = snap.docs.map((docSnap) => ({
         id: docSnap.id,
         role: docSnap.data().role?.toLowerCase(),
         eliminated: docSnap.data().eliminated,
-        isMrWhiteCorrect: true,
+        isMrWhiteCorrect: docSnap.data().role?.toLowerCase() === "mrwhite",
       }));
 
       const scores = calculateScores(players, "mrwhite");
@@ -74,9 +73,9 @@ export default function MrWhiteGuess() {
         )
       );
 
-      // ✅ Pindah ke leaderboard
       navigate("/leaderboard", { state: { gameId, winner: "mrwhite" } });
     } else {
+      // ❌ SALAH: update flag, lalu check winner
       await updateDoc(doc(db, "games", gameId), {
         mrWhiteGuessed: true,
         isMrWhiteCorrect: false,
@@ -104,7 +103,10 @@ export default function MrWhiteGuess() {
 
         navigate("/leaderboard", { state: { gameId, winner } });
       } else {
-        navigate("/votescreen", { state: { gameId } });
+        // ✅ Kembali ke VoteScreen dengan roles aman
+        const gameDoc = await getDoc(doc(db, "games", gameId));
+        const roles = gameDoc.data()?.roles || {};
+        navigate("/votescreen", { state: { gameId, roles } });
       }
     }
   };
@@ -119,6 +121,7 @@ export default function MrWhiteGuess() {
       }}
     >
       <div className="absolute inset-0 bg-[#0b1b2a]/70 z-0" />
+
       <form
         onSubmit={handleSubmit}
         className="relative z-10 bg-white/90 rounded-xl shadow-2xl px-8 py-10 w-full max-w-md flex flex-col items-center"

@@ -8,18 +8,18 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   return (
-    <div className="flex h-screen">
+    <div className="flex flex-col md:flex-row h-screen">
       {/* Sidebar */}
-      <Sidebar />
+      <Sidebar/>
 
       {/* Main Content Area */}
-      <div className="relative flex-1 flex flex-col min-h-screen">
+      <div className="relative flex-1 flex flex-col">
         {/* Background Image */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat -z-10"
           style={{ backgroundImage: `url(${bg})` }}
         />
-        
+
         {/* Optional overlay */}
         <div className="absolute inset-0 bg-[#0b1b2a]/60 -z-10" />
 
@@ -30,10 +30,10 @@ export default function Dashboard() {
         <main className="flex-1 flex items-center justify-center relative z-10 px-4">
           <button
             onClick={() => navigate('/gamesetup')}
-            className="cursor-pointer flex items-center justify-center rounded-full bg-[#fff3] hover:bg-[#ffe7a0]/30 transition w-56 h-56 shadow-xl"
+            className="cursor-pointer flex items-center justify-center rounded-full bg-[#fff3] hover:bg-[#ffe7a0]/30 transition w-40 h-40 md:w-56 md:h-56 shadow-xl"
             aria-label="Play"
           >
-            <IoPlayCircleOutline size={140} className="text-[#ffe7a0]" />
+            <IoPlayCircleOutline size={120} className="text-[#ffe7a0] md:text-[140px]" />
           </button>
         </main>
       </div>

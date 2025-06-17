@@ -6,7 +6,14 @@ import RoleList from "../components/RoleList";
 import EliminationScreen from "../components/EliminationScreen";
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { collection, getDocs } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  getDoc,
+  doc,
+  updateDoc
+} from "firebase/firestore";
+
 import { db } from "../firebase/config";
 import ROLE_META from "../constants/RoleMeta";
 import {
@@ -25,8 +32,9 @@ type Player = {
 export default function VoteScreen() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { gameId, roles } = location.state || {};
+  const { gameId, roles: initRoles } = location.state || {};
 
+  const [roles, setRoles] = useState(initRoles || {});
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -34,28 +42,33 @@ export default function VoteScreen() {
 
   useEffect(() => {
     if (!gameId) return;
-    const fetchPlayers = async () => {
-      try {
-        const snap = await getDocs(collection(db, "games", gameId, "players"));
-        const arr: Player[] = [];
-        snap.forEach((docSnap) => {
-          const data = docSnap.data();
-          arr.push({
-            id: docSnap.id,
-            username: data.username,
-            role: data.role?.toLowerCase(), // ✅ ensure lowercase
-            score: data.score,
-            word: data.word,
-            eliminated: data.eliminated,
-          });
-        });
-        setPlayers(arr);
-      } catch (err) {
-        console.error(err);
-        setPlayers([]);
+
+    const fetchAll = async () => {
+      // ✅ Kalau roles kosong, ambil dari Firestore supaya tidak stuck
+      if (!initRoles) {
+        const gameDoc = await getDoc(doc(db, "games", gameId));
+        const rolesFromDB = gameDoc.data()?.roles || {};
+        setRoles(rolesFromDB);
       }
+
+      // ✅ Fetch players
+      const snap = await getDocs(collection(db, "games", gameId, "players"));
+      const arr: Player[] = [];
+      snap.forEach((docSnap) => {
+        const data = docSnap.data();
+        arr.push({
+          id: docSnap.id,
+          username: data.username,
+          role: data.role?.toLowerCase(),
+          score: data.score,
+          word: data.word,
+          eliminated: data.eliminated,
+        });
+      });
+      setPlayers(arr);
     };
-    fetchPlayers();
+
+    fetchAll();
   }, [gameId, eliminatedPlayer]);
 
   const handleElimination = () => {
@@ -66,17 +79,18 @@ export default function VoteScreen() {
   };
 
   if (eliminatedPlayer) {
-    // ✅ Mr White → langsung finalize & redirect ke guess page
-    if (eliminatedPlayer.role.toLowerCase() === "mrwhite") {
-      finalizeEliminationAndCheckWinner(
-        gameId,
-        eliminatedPlayer.id,
-        navigate
-      );
+    const role = eliminatedPlayer.role.toLowerCase();
+
+    if (role === "mrwhite") {
+      // ✅ Mr White → Tandai eliminated + redirect ke tebak kata
+      // Jangan finalize winner di sini!
+      const playerRef = doc(db, "games", gameId, "players", eliminatedPlayer.id);
+      updateDoc(playerRef, { eliminated: true }).then(() => {
+        navigate("/mrwhiteguess", { state: { gameId } });
+      });
       return null;
     }
 
-    // ✅ Other → show elimination screen
     return (
       <EliminationScreen
         role={eliminatedPlayer.role}
@@ -119,7 +133,6 @@ export default function VoteScreen() {
       <GameLogo src={logo} onClick={() => navigate("/dashboard")} />
 
       <div className="relative z-10 flex flex-row items-center justify-center w-full max-w-7xl px-2 md:px-8">
-        {/* Sidebar */}
         <div className="bg-[#f5f6f7]/95 rounded-2xl shadow-xl w-[320px] min-h-[320px] flex flex-col px-8 py-8 mr-4 md:mr-12">
           <div className="text-2xl font-bold mb-2">Find Them</div>
           <div className="text-[#3b5c7e] text-md mb-6 font-semibold">
@@ -139,7 +152,6 @@ export default function VoteScreen() {
           </button>
         </div>
 
-        {/* Player Grid */}
         <div className="flex-1 flex flex-col items-center justify-center">
           <div
             className="grid gap-8"
@@ -205,7 +217,6 @@ export default function VoteScreen() {
         </div>
       </div>
 
-      {/* Confirmation Modal */}
       {showConfirm && selectedIdx !== null && !eliminatedPlayer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="bg-white rounded-xl shadow-2xl p-8 flex flex-col items-center">

@@ -23,23 +23,30 @@ export function calculateScores(players: Player[], winner: Winner): Record<strin
       totalScore: 0
     };
 
-    // Base scoring
-    if (!player.eliminated && player.role === winner) {
+    // ✅ Base Score
+    // Mr White: jika MENANG, selalu dapat base walau eliminated
+    if (
+      (player.role === "mrwhite" && winner === "mrwhite" && player.isMrWhiteCorrect) ||
+      (player.role === winner && player.role !== "mrwhite" && !player.eliminated)
+    ) {
       scoreData.baseScore = 100;
-      
-      // Role-specific bonuses
-      if (player.role === "undercover") {
-        scoreData.roleBonus = 50;
-      } else if (player.role === "mrwhite" && player.isMrWhiteCorrect) {
-        scoreData.roleBonus = 100;
-      }
     }
 
-    // Penalties
+    // ✅ Role-specific bonus
+    if (player.role === "undercover" && winner === "undercover") {
+      scoreData.roleBonus = 50;
+    }
+
+    if (player.role === "mrwhite" && player.isMrWhiteCorrect) {
+      scoreData.roleBonus = 100;
+    }
+
+    // ✅ Penalty for losing & eliminated
     if (player.eliminated && player.role !== winner) {
       scoreData.eliminationPenalty = -30;
     }
 
+    // ✅ Total
     scoreData.totalScore = Math.max(
       0,
       scoreData.baseScore + scoreData.roleBonus + scoreData.eliminationPenalty
