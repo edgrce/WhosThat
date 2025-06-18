@@ -7,41 +7,57 @@ import mrwhite from "../assets/mrwhite.png";
 
 export default function InformationPage() {
   return (
-    <div className="relative flex h-screen min-h-screen overflow-hidden">
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat -z-10"
-        style={{ backgroundImage: `url(${bg})` }}
-      />
-      <div className="absolute inset-0 bg-[#0b1b2a]/70 -z-10" />
+    <div className="flex flex-col md:flex-row h-screen">
+      {/* Sidebar */}
+      <Sidebar/>
 
-      <Sidebar />
+      {/* Main Content Area */}
+      <div className="relative flex-1 flex flex-col">
+        {/* Background Image */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat -z-10"
+          style={{ backgroundImage: `url(${bg})` }}
+        />
 
-      <div className="flex-1 flex flex-col min-h-screen">
-        <Navbar />
+        {/* Optional overlay */}
+        <div className="absolute inset-0 bg-[#0b1b2a]/60 -z-10" />
 
-        <main className="flex-1 flex items-center justify-center px-2 py-8">
-          <div className="w-full max-w-6xl flex flex-col md:flex-row gap-8">
-            <div className="flex-1 bg-[#e0e0e0]/95 rounded-xl shadow-lg flex flex-col items-center px-6 py-10 text-center">
-              <img src={civilain} alt="" className="w-32 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold font-[cursive] mb-2">Civilian</h2>
-              <p className="font-[cursive] text-base">
-                Receive the same word.<br />
+        {/* Navbar */}
+        <div className="sticky top-0 z-20">
+          <Navbar />
+        </div>
+
+        <main className="flex flex-1 items-center justify-center px-4 py-8">
+          <div className="grid w-full max-w-6xl gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {/* Civilian Card */}
+            <div className="flex flex-col items-center rounded-xl bg-[#e0e0e0]/95 p-6 text-center shadow-lg">
+              <img src={civilain} alt="Civilian" className="w-28 mb-4" />
+              <h2 className="mb-2 text-2xl font-bold font-[cursive]">Civilian</h2>
+              <p className="text-base font-[cursive]">
+                Receive the same word.
+                <br />
                 Their goal is to find Undercover and Mr. White
               </p>
             </div>
-            <div className="flex-1 bg-[#474965]/95 rounded-xl shadow-lg flex flex-col items-center px-6 py-10 text-center">
-              <img src={undercover} alt="" className="w-32 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold italic font-[cursive] mb-2">Undercover</h2>
-              <p className="font-[cursive] text-base">
-                Gets a slightly different word from Civilian.<br />
+
+            {/* Undercover Card */}
+            <div className="flex flex-col items-center rounded-xl bg-[#474965]/95 p-6 text-center shadow-lg">
+              <img src={undercover} alt="Undercover" className="w-28 mb-4" />
+              <h2 className="mb-2 text-2xl font-bold italic font-[cursive]">Undercover</h2>
+              <p className="text-base font-[cursive]">
+                Gets a slightly different word from Civilian.
+                <br />
                 The goal is to pretend to be one of them and persevere to the end to win.
               </p>
             </div>
-            <div className="flex-1 bg-[#ffe7a0]/95 rounded-xl shadow-lg flex flex-col items-center px-6 py-10 text-center">
-              <img src={mrwhite} alt="" className="w-25 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold font-[cursive] mb-2">Mr.White</h2>
-              <p className="font-[cursive] text-base">
-                Not accepting any words.<br />
+
+            {/* Mr.White Card */}
+            <div className="flex flex-col items-center rounded-xl bg-[#ffe7a0]/95 p-6 text-center shadow-lg">
+              <img src={mrwhite} alt="Mr.White" className="w-28 mb-4" />
+              <h2 className="mb-2 text-2xl font-bold font-[cursive]">Mr.White</h2>
+              <p className="text-base font-[cursive]">
+                Not accepting any words.
+                <br />
                 The goal is to pretend to have a word, as well as to guess the civilian's word.
               </p>
             </div>

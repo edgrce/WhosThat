@@ -11,14 +11,6 @@ import { db } from "../firebase/config";
 import { checkWinnerAndFinishGame } from "../hooks/useGameElimination";
 import { calculateScores } from "../utils/scoreUtils";
 import bg from "../assets/bg.jpeg";
-import GameLogo from "../components/GameLogo";
-
-interface Player {
-  id: string;
-  role: string;
-  eliminated?: boolean;
-  isMrWhiteCorrect?: boolean;
-}
 
 export default function MrWhiteGuess() {
   const navigate = useNavigate();
@@ -48,7 +40,6 @@ export default function MrWhiteGuess() {
     const normalizedWord = word1.trim().toLowerCase();
 
     if (normalizedGuess === normalizedWord) {
-      // ✅ BENAR: Mr. White menang
       await updateDoc(doc(db, "games", gameId), {
         status: "finished",
         winner: "mrwhite",
@@ -57,7 +48,7 @@ export default function MrWhiteGuess() {
       });
 
       const snap = await getDocs(collection(db, "games", gameId, "players"));
-      const players: Player[] = snap.docs.map((docSnap) => ({
+      const players = snap.docs.map((docSnap) => ({
         id: docSnap.id,
         role: docSnap.data().role?.toLowerCase(),
         eliminated: docSnap.data().eliminated,
@@ -65,17 +56,20 @@ export default function MrWhiteGuess() {
       }));
 
       const scores = calculateScores(players, "mrwhite");
+
       await Promise.all(
-        Object.entries(scores).map(([id, s]) =>
-          updateDoc(doc(db, "games", gameId, "players", id), {
-            score: s.totalScore,
-          })
-        )
+        snap.docs.map(async (docSnap) => {
+          const p = docSnap.data();
+          const newRoundScore = scores[p.username].roundScore;
+          await updateDoc(doc(db, "games", gameId, "players", p.username), {
+            score: newRoundScore,
+            totalScore: (p.totalScore ?? 0) + newRoundScore,
+          });
+        })
       );
 
       navigate("/leaderboard", { state: { gameId, winner: "mrwhite" } });
     } else {
-      // ❌ SALAH: update flag, lalu check winner
       await updateDoc(doc(db, "games", gameId), {
         mrWhiteGuessed: true,
         isMrWhiteCorrect: false,
@@ -85,7 +79,7 @@ export default function MrWhiteGuess() {
 
       if (winner) {
         const snap = await getDocs(collection(db, "games", gameId, "players"));
-        const players: Player[] = snap.docs.map((docSnap) => ({
+        const players = snap.docs.map((docSnap) => ({
           id: docSnap.id,
           role: docSnap.data().role?.toLowerCase(),
           eliminated: docSnap.data().eliminated,
@@ -93,17 +87,20 @@ export default function MrWhiteGuess() {
         }));
 
         const scores = calculateScores(players, winner);
+
         await Promise.all(
-          Object.entries(scores).map(([id, s]) =>
-            updateDoc(doc(db, "games", gameId, "players", id), {
-              score: s.totalScore,
-            })
-          )
+          snap.docs.map(async (docSnap) => {
+            const p = docSnap.data();
+            const newRoundScore = scores[p.username].roundScore;
+            await updateDoc(doc(db, "games", gameId, "players", p.username), {
+              score: newRoundScore,
+              totalScore: (p.totalScore ?? 0) + newRoundScore,
+            });
+          })
         );
 
         navigate("/leaderboard", { state: { gameId, winner } });
       } else {
-        // ✅ Kembali ke VoteScreen dengan roles aman
         const gameDoc = await getDoc(doc(db, "games", gameId));
         const roles = gameDoc.data()?.roles || {};
         navigate("/votescreen", { state: { gameId, roles } });

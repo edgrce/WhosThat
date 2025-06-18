@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   doc,
@@ -19,10 +19,7 @@ type Roles = {
   mrWhite: number;
 };
 
-function getRandomRole(
-  roles: Roles,
-  realAssignedRoles: string[]
-): keyof Roles {
+function getRandomRole(roles: Roles, realAssignedRoles: string[]): keyof Roles {
   const pool: (keyof Roles)[] = [];
 
   Object.entries(roles).forEach(([role, count]) => {
@@ -48,6 +45,7 @@ export default function LoginUsername() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // ✅ Extract state & fallback
   const {
     gameId,
     playersCount,
@@ -58,6 +56,13 @@ export default function LoginUsername() {
     assignedNames = [],
   } = location.state || {};
 
+  // ✅ Auto redirect kalau tidak ada gameId → mencegah blank page
+  useEffect(() => {
+    if (!gameId) {
+      navigate("/dashboard");
+    }
+  }, [gameId, navigate]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim()) {
@@ -66,7 +71,7 @@ export default function LoginUsername() {
     }
 
     try {
-      // ✅ Ambil semua player yang sudah login
+      // ✅ Ambil players yang sudah login
       const playersSnap = await getDocs(
         collection(db, "games", gameId, "players")
       );
@@ -77,13 +82,11 @@ export default function LoginUsername() {
         doc.data().username
       );
 
-      // ✅ Cek username unik
       if (realAssignedNames.includes(username)) {
         setError("Username already used in this game.");
         return;
       }
 
-      // ✅ Ambil kata civilian & undercover
       const gameDoc = await getDoc(doc(db, "games", gameId));
       let word1 = gameDoc.data()?.word1;
       let word2 = gameDoc.data()?.word2;
@@ -107,26 +110,21 @@ export default function LoginUsername() {
         await updateDoc(doc(db, "games", gameId), { word1, word2 });
       }
 
-      // ✅ Assign role with real data
       const role = getRandomRole(roles, realAssignedRoles).toLowerCase();
-
-      // ✅ Assign word based on role
       let word = "";
       if (role === "civilian") word = word1;
       else if (role === "undercover") word = word2;
-      else word = ""; // Mr. White tidak punya kata
 
-      // ✅ Simpan player ke Firestore
       const playerRef = doc(db, "games", gameId, "players", username);
       await setDoc(playerRef, {
         username,
         role,
         word,
         score: 0,
+        totalScore: 0, // ✅ pastikan awal totalScore ada
         createdAt: new Date(),
       });
 
-      // ✅ Lanjut ke show word page
       navigate("/playershowword", {
         state: {
           gameId,

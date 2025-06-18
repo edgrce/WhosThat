@@ -24,6 +24,7 @@ import PlayerShowWord from "./pages/PlayerShowWord";
 import VoteScreen from "./pages/VoteScreen";
 import Leaderboard from "./pages/Leaderboard";
 import MrWhiteGuess from "./pages/MrWhiteGuess";
+import LeaderboardPage from "./pages/LeaderboardPage";
 
 // Komponen wrapper untuk loading logic
 function AppWrapper() {
@@ -72,6 +73,7 @@ function AppWrapper() {
       <Route path="/votescreen" element={<VoteScreen />} />
       <Route path="/leaderboard" element={<Leaderboard />} />
       <Route path="/mrwhiteguess" element={<MrWhiteGuess />} />
+      <Route path="/leaderboardpage" element={<LeaderboardPage />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />

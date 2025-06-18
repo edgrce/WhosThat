@@ -17,15 +17,6 @@ export interface Player {
   isMrWhiteCorrect?: boolean;
 }
 
-export async function processElimination(
-  gameId: string,
-  playerId: string,
-  player: any,
-  navigate: any
-) {
-  return true;
-}
-
 export async function checkWinnerAndFinishGame(gameId: string): Promise<Winner | undefined> {
   const gameRef = doc(db, "games", gameId);
   const gameDoc = await getDoc(gameRef);
@@ -52,19 +43,16 @@ export async function checkWinnerAndFinishGame(gameId: string): Promise<Winner |
 
   let winner: Winner | undefined = undefined;
 
-  // ✅ If no undercover left -> check mrwhite
   if (!aliveRoles.has("undercover")) {
     if (!aliveRoles.has("mrwhite") || (mrWhiteGuessed && !players.find(p => p.role === "mrwhite")?.isMrWhiteCorrect)) {
       winner = "civilian";
     }
   }
 
-  // ✅ Undercover ratio: undercover ≥ civilian → undercover win
   if (aliveUndercover >= aliveCivilian) {
     winner = "undercover";
   }
 
-  // ✅ If all civilians dead and undercover still alive → undercover win
   if (!aliveRoles.has("civilian") && aliveRoles.has("undercover")) {
     winner = "undercover";
   }
@@ -88,13 +76,11 @@ export async function finalizeEliminationAndCheckWinner(
   const playerRef = doc(db, "games", gameId, "players", playerId);
   const playerSnap = await getDoc(playerRef);
   const player = playerSnap.data();
-
   const role = player?.role?.toLowerCase();
 
   await updateDoc(playerRef, { eliminated: true });
 
   if (role === "mrwhite") {
-    // ✅ Mr White → guess dulu, winner dicek di guess page
     navigate("/mrwhiteguess", { state: { gameId } });
     return;
   }
@@ -116,15 +102,16 @@ export async function finalizeEliminationAndCheckWinner(
     const scores = calculateScores(players, winner);
 
     await Promise.all(
-      Object.entries(scores).map(([id, s]) =>
-        updateDoc(doc(db, "games", gameId, "players", id), {
-          score: s.totalScore,
-        })
-      )
+      snap.docs.map(async (docSnap) => {
+        const p = docSnap.data();
+        const newRoundScore = scores[p.username].roundScore;
+        await updateDoc(doc(db, "games", gameId, "players", p.username), {
+          score: newRoundScore,
+          totalScore: (p.totalScore ?? 0) + newRoundScore,
+        });
+      })
     );
 
-    navigate("/leaderboard", {
-      state: { gameId, winner },
-    });
+    navigate("/leaderboard", { state: { gameId, winner } });
   }
 }

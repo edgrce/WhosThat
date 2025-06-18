@@ -57,7 +57,7 @@ export default function Sidebar() {
             </li>
             <li>
               <a
-                href="/leaderboard"
+                href="/leaderboardpage"
                 onClick={() => setIsOpen(false)}
                 className="flex items-center gap-4 text-xl font-bold text-[#ffe7a0] hover:text-[#dbeafe] transition"
               >

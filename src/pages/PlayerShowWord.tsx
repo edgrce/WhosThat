@@ -1,4 +1,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase/config";
 import bg from "../assets/bg.jpeg";
 import cardIcon from "../assets/cards.png";
 
@@ -13,10 +16,29 @@ export default function PlayerShowWord() {
     currentPlayer,
     assignedRoles = [],
     assignedNames = [],
+    usernames = [],
     username,
-    role,
-    word,
+    isNextRound = false,
   } = state || {};
+
+  const [role, setRole] = useState("");
+  const [word, setWord] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  // ✅ Fetch role & word dari Firestore biar akurat
+  useEffect(() => {
+    const fetchData = async () => {
+      const docRef = doc(db, "games", gameId, "players", username);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        setRole(data.role);
+        setWord(data.word);
+      }
+      setLoading(false);
+    };
+    fetchData();
+  }, [gameId, username]);
 
   const nextPlayer = currentPlayer + 1;
 
@@ -31,13 +53,23 @@ export default function PlayerShowWord() {
           currentPlayer: nextPlayer,
           assignedRoles,
           assignedNames,
+          usernames,
+          isNextRound,
         },
       });
     } else {
-      // Semua player sudah dapat card, lanjut ke tahap berikutnya (misal: game start)
+      // Semua sudah dapat, lanjut ke VoteScreen
       navigate("/votescreen", { state: { gameId, roles } });
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white bg-black">
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <div
@@ -53,10 +85,10 @@ export default function PlayerShowWord() {
         <img src={cardIcon} alt="player" className="w-24 h-24 mb-2" />
         <div className="text-xl font-bold mb-2">{username}</div>
         <div className="bg-gray-300 rounded-xl w-full h-48 flex items-center justify-center text-4xl font-bold mb-8">
-          {role === "mrWhite" ? (
+          {role === "mrwhite" ? (
             <span className="text-gray-500 text-center">
               No Word <br />
-              you're Mr.White
+              You're Mr.White
             </span>
           ) : (
             word
