@@ -1,14 +1,24 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaUserCircle, FaCamera, FaSignOutAlt } from "react-icons/fa";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
 import bg from "../assets/bg.jpeg";
+import { getAuth } from "firebase/auth";
 
 export default function Profile() {
   const [profileImg, setProfileImg] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  // ✅ Ambil current user dari Firebase Auth
+  useEffect(() => {
+    const auth = getAuth();
+    if (auth.currentUser) {
+      setUsername(auth.currentUser.displayName || auth.currentUser.email);
+    }
+  }, []);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -38,7 +48,6 @@ export default function Profile() {
           className="absolute inset-0 bg-cover bg-center bg-no-repeat -z-10"
           style={{ backgroundImage: `url(${bg})` }}
         />
-        {/* Optional overlay */}
         <div className="absolute inset-0 bg-[#0b1b2a]/60 -z-10" />
 
         {/* Navbar */}
@@ -47,18 +56,13 @@ export default function Profile() {
         {/* Content */}
         <main className="flex-1 flex items-center justify-center px-4 py-8 relative z-10">
           <div className="relative bg-[#071829]/70 backdrop-blur-lg rounded-xl shadow-2xl px-3 py-8 w-full max-w-sm flex flex-col items-center">
+            
             {/* Avatar */}
             <div className="absolute -top-14 left-1/2 -translate-x-1/2 flex flex-col items-center">
               <div className="relative">
-                {profileImg ? (
-                  <img
-                    src={profileImg}
-                    alt="Profile"
-                    className="w-24 h-24 rounded-full border-4 border-[#ffe7a0] object-cover bg-[#0b1b2a]"
-                  />
-                ) : (
-                  <FaUserCircle className="w-20 h-20 text-[#ffe7a0] bg-[#0b1b2a] rounded-full border-4 border-[#ffe7a0]" />
-                )}
+                {/* ✅ Selalu pakai icon */}
+                <FaUserCircle className="w-24 h-24 text-[#ffe7a0] bg-[#0b1b2a] rounded-full border-4 border-[#ffe7a0]" />
+
                 <button
                   onClick={handleProfileClick}
                   className="absolute bottom-1 right-1 bg-[#ffe7a0] text-[#0b1b2a] rounded-full p-1 border-2 border-white hover:bg-[#ffe7a0]/80 transition"
@@ -66,6 +70,7 @@ export default function Profile() {
                 >
                   <FaCamera size={16} />
                 </button>
+
                 <input
                   type="file"
                   accept="image/*"
@@ -76,12 +81,18 @@ export default function Profile() {
               </div>
             </div>
 
+            <div className="mt-6 mb-2 text-center">
+              <h1 className="text-[#ffe7a0] text-xl font-bold break-words">
+                {username || "Anonymous"}
+              </h1>
+            </div>
+
             {/* Stats */}
-            <div className="mt-2 w-full">
+            <div className="w-full">
               <h2 className="text-[#ffe7a0] text-lg font-bold mb-4 font-[cursive] text-center">
                 activity
               </h2>
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 mb-4">
                 {[
                   { label: "Match", value: "0", bg: "#cbe3e8" },
                   { label: "Winrate", value: "0%", bg: "#fbb6ce" },
@@ -90,7 +101,7 @@ export default function Profile() {
                 ].map((item, i) => (
                   <div
                     key={i}
-                    className="rounded-lg flex flex-col items-center justify-center py-4"
+                    className="rounded-lg flex flex-col items-center justify-center py-4 hover:scale-105 transition"
                     style={{ backgroundColor: item.bg }}
                   >
                     <span className="text-2xl font-bold italic text-white drop-shadow">

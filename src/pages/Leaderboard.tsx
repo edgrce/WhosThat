@@ -90,7 +90,7 @@ export default function Leaderboard() {
         return "Civilians win!";
       case "undercover":
         return "Undercover wins!";
-      case "mrWhite":
+      case "mrwhite":
         return "Mr. White wins!";
       default:
         return "Game Over";

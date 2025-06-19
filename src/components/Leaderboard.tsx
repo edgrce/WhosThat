@@ -1,3 +1,4 @@
+// ✅ Leaderboard.tsx (rapi & responsive)
 import { useEffect, useState } from "react";
 import { db } from "../firebase/config";
 import {
@@ -5,7 +6,6 @@ import {
   getDocs,
   query,
   orderBy,
-  doc,
   updateDoc,
 } from "firebase/firestore";
 import civilianIcon from "../assets/civilain.png";
@@ -33,14 +33,11 @@ export default function Leaderboard({
 
   useEffect(() => {
     const fetchPlayers = async () => {
-      let playersRef;
-      if (gameId) {
-        playersRef = collection(db, "games", gameId, "players");
-      } else {
-        playersRef = collection(db, "users");
-      }
+      const ref = gameId
+        ? collection(db, "games", gameId, "players")
+        : collection(db, "users");
 
-      const q = query(playersRef, orderBy("totalScore", "desc"));
+      const q = query(ref, orderBy("totalScore", "desc"));
       const snap = await getDocs(q);
       const data: Player[] = [];
       let max = 0;
@@ -70,13 +67,13 @@ export default function Leaderboard({
   };
 
   const handleClear = async () => {
-    const confirm = window.confirm("Are you sure you want to reset all scores?");
-    if (!confirm) return;
+    if (!window.confirm("Are you sure you want to reset all scores?")) return;
 
-    const q = query(
-      gameId ? collection(db, "games", gameId, "players") : collection(db, "users")
-    );
-    const snap = await getDocs(q);
+    const ref = gameId
+      ? collection(db, "games", gameId, "players")
+      : collection(db, "users");
+
+    const snap = await getDocs(ref);
     await Promise.all(
       snap.docs.map((docSnap) =>
         updateDoc(docSnap.ref, { totalScore: 0, score: 0 })
@@ -86,7 +83,7 @@ export default function Leaderboard({
   };
 
   return (
-    <div className="bg-white/90 rounded-2xl shadow-xl mt-20 px-4 sm:px-6 md:px-8 py-6 sm:py-8 w-full max-w-3xl mx-auto">
+    <div className="bg-white/90 rounded-2xl shadow-xl mt-12 px-4 py-6 w-full">
       <h1 className="text-xl sm:text-2xl font-bold mb-6 text-center text-[#22364a]">
         Leaderboard
       </h1>
@@ -95,7 +92,7 @@ export default function Leaderboard({
         {players.map((p, index) => (
           <div
             key={index}
-            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-6 bg-white/70 px-4 py-3 rounded-lg"
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-6 bg-white/70 px-4 py-3 rounded-lg transition hover:shadow-lg"
           >
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <div
@@ -107,12 +104,12 @@ export default function Leaderboard({
               </div>
 
               <div className="flex-1 min-w-0">
-                <div className="text-sm sm:text-base font-bold text-[#22364a] truncate">
+                <div className="text-base sm:text-lg font-bold text-[#22364a] truncate">
                   {p.username}
                 </div>
                 <div className="w-full bg-gray-300 rounded-full h-2 mt-1">
                   <div
-                    className={`h-2 rounded-full transition-all duration-500 ${
+                    className={`h-2 rounded-full ${
                       index === 0 ? "bg-yellow-400" : "bg-gray-400"
                     }`}
                     style={{
@@ -125,7 +122,7 @@ export default function Leaderboard({
               </div>
             </div>
 
-            <div className="flex items-center justify-between sm:justify-end gap-3">
+            <div className="flex items-center justify-between sm:justify-end gap-4">
               <div className="text-right">
                 <div className="text-sm sm:text-base font-bold text-[#22364a]">
                   {p.totalScore ?? 0}
@@ -135,7 +132,7 @@ export default function Leaderboard({
               <img
                 src={getRoleIcon(p.role)}
                 alt={p.role}
-                className="w-5 h-5 sm:w-6 sm:h-6"
+                className="w-5 h-5 sm:w-6 sm:h-6 shrink-0"
               />
             </div>
           </div>
